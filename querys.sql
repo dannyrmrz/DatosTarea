@@ -81,16 +81,17 @@ AND p.low_price_holofoil IS NOT NULL
 ORDER BY price_difference DESC
 LIMIT 3;
 
-SELECT c.types, c.name, r.rarity_name, p.market_price_holofoil
-FROM pokemon_prices p
-JOIN pokemon_cards c ON p.rarity_id = c.rarity_id
-JOIN price_dates pd ON p.price_date_id = pd.id
-JOIN pokemon_rarity r ON c.rarity_id = r.id
-WHERE pd.price_date = (SELECT MAX(price_date) FROM price_dates)
-AND p.market_price_holofoil = (
-  SELECT MAX(p2.market_price_holofoil)
-  FROM pokemon_prices p2
-  JOIN pokemon_cards c2 ON p2.rarity_id = c2.rarity_id
-  WHERE c2.types = c.types
-);
+WITH RankedCards AS (
+    SELECT c.types, c.name, p.market_price_holofoil,
+           ROW_NUMBER() OVER (PARTITION BY c.types ORDER BY p.market_price_holofoil DESC) AS rank
+    FROM pokemon_cards c
+    JOIN pokemon_prices p ON c.rarity_id = p.rarity_id
+    JOIN price_dates pd ON p.price_date_id = pd.id
+    WHERE pd.price_date = (SELECT MAX(price_date) FROM price_dates)
+    AND p.market_price_holofoil IS NOT NULL
+)
+SELECT types, name, market_price_holofoil
+FROM RankedCards
+WHERE rank = 1;
+
 
